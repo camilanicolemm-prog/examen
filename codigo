@@ -1,0 +1,156 @@
+/*******************************************************
+ ROBOT SUMO 4 RUEDAS - 1 L298N
+ Alimentación por VIN
+ Optimizado para competencia escolar
+*******************************************************/
+
+// ====== AJUSTE DE DIRECCIÓN ======
+// 0 = Estándar
+// 1 = Invertido (si avanza hacia atrás)
+#define INVERTED_DRIVE 1
+
+// ====== L298N ======
+const int IN1 = 7;
+const int IN2 = 4;
+const int IN3 = 3;
+const int IN4 = 2;
+const int ENA = 5;
+const int ENB = 6;
+
+// ====== Sensores ======
+const int IR_LEFT  = A0;
+const int IR_RIGHT = A1;
+
+const int US_TRIG = A2;
+const int US_ECHO = A3;
+
+// ====== Parámetros ajustados para 4 motores ======
+int SPEED_ATTACK = 255;     // máxima fuerza
+int SPEED_SEARCH = 190;
+int SPEED_ESCAPE = 210;
+
+int IR_ANALOG_THRESHOLD = 450;  // Ajustado para piso negro/blanco común
+int ENEMY_DISTANCE_CM = 45;     // Detecta antes
+
+// ================= MOTORES =================
+
+void motorStop() {
+  digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
+  analogWrite(ENA, 0);
+  analogWrite(ENB, 0);
+}
+
+void motorForward(int spd) {
+#if INVERTED_DRIVE
+  digitalWrite(IN1, LOW);  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, LOW);  digitalWrite(IN4, HIGH);
+#else
+  digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
+  digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
+#endif
+  analogWrite(ENA, spd);
+  analogWrite(ENB, spd);
+}
+
+void motorBackward(int spd) {
+#if INVERTED_DRIVE
+  digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
+  digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
+#else
+  digitalWrite(IN1, LOW);  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, LOW);  digitalWrite(IN4, HIGH);
+#endif
+  analogWrite(ENA, spd);
+  analogWrite(ENB, spd);
+}
+
+void turnLeft(int spd) {
+#if INVERTED_DRIVE
+  digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);  digitalWrite(IN4, HIGH);
+#else
+  digitalWrite(IN1, LOW);  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
+#endif
+  analogWrite(ENA, spd);
+  analogWrite(ENB, spd);
+}
+
+void turnRight(int spd) {
+#if INVERTED_DRIVE
+  digitalWrite(IN1, LOW);  digitalWrite(IN2, HIGH);
+  digitalWrite(IN3, HIGH); digitalWrite(IN4, LOW);
+#else
+  digitalWrite(IN1, HIGH); digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);  digitalWrite(IN4, HIGH);
+#endif
+  analogWrite(ENA, spd);
+  analogWrite(ENB, spd);
+}
+
+// ================= IR =================
+
+bool readIR(int pin) {
+  int v = analogRead(pin);
+  return (v < IR_ANALOG_THRESHOLD);
+}
+
+// ================= ULTRASONIDO =================
+
+long readDistanceCM() {
+  digitalWrite(US_TRIG, LOW);
+  delayMicroseconds(2);
+  digitalWrite(US_TRIG, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(US_TRIG, LOW);
+
+  long duration = pulseIn(US_ECHO, HIGH, 25000UL);
+  if (duration == 0) return 999;
+  return duration / 58;
+}
+
+void setup() {
+
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+  pinMode(ENA, OUTPUT);
+  pinMode(ENB, OUTPUT);
+
+  pinMode(US_TRIG, OUTPUT);
+  pinMode(US_ECHO, INPUT);
+
+  motorStop();
+  delay(800);  // pequeño retardo inicial
+}
+
+void loop() {
+
+  bool L = readIR(IR_LEFT);
+  bool R = readIR(IR_RIGHT);
+
+  // ---- ESCAPE DE BORDE ----
+  if (L || R) {
+    motorBackward(SPEED_ESCAPE);
+    delay(250);
+    turnRight(SPEED_ESCAPE);
+    delay(200);
+    return;
+  }
+
+  
+  long d = readDistanceCM();
+
+  if (d <= ENEMY_DISTANCE_CM) {
+    motorForward(SPEED_ATTACK);
+  } else {
+    motorForward(SPEED_SEARCH);
+    delay(180);
+    turnLeft(SPEED_SEARCH); 
+    delay(140);
+  }
+
+  delay(15);
+}
